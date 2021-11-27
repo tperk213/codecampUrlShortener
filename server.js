@@ -17,7 +17,7 @@ mongoose.connect(
 
 const urlPairSchema = new Schema({
   origionalUrl : {type: String, required:true},
-  shortUrl: {type: String}
+  shortUrl: {type: Number}
 })
 
 let UrlPair = mongoose.model("UrlPair", urlPairSchema);
@@ -72,10 +72,10 @@ app.post('/api/shorturl', async (req, res) =>{
 
   var shortUrls = await UrlPair.find({},{shortUrl:1, _id:0});
 
-  const newShortUrl = Math.floor(Math.random() * max).toString();
+  const newShortUrl = Math.floor(Math.random() * max);
 
   while(newShortUrl in shortUrls){
-    newShortUrl = Math.floor(Math.random() * max).toString();
+    newShortUrl = Math.floor(Math.random() * max);
   }
 
   UrlPair.create({origionalUrl:req.body.url, shortUrl: newShortUrl})
@@ -90,14 +90,14 @@ app.post('/api/shorturl', async (req, res) =>{
 });
 
 app.get('/api/shorturl/:shortUrl', async (req, res)=>{
-  const short = req.params.shortUrl;
+  const short = parseInt(req.params.shortUrl);
   const pair = await UrlPair.findOne({shortUrl:short});
   if(!pair){
     //error
     res.send("error finding short");
   }
 
-  res.redirect(301, "http://" + pair.origionalUrl);
+  res.redirect(301,pair.origionalUrl);
 });
 
 
