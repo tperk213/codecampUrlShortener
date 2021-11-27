@@ -3,7 +3,28 @@ const express = require('express');
 const cors = require('cors');
 const dns = require('dns');
 const app = express();
+
+var mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+
+mongoose.connect(
+  process.env['MONGO_URI'],
+  {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+  }
+);
+
+const urlPairSchema = new Schema({
+  origionalUrl : {type: String, required:true},
+  shortUrl: {type: String}
+})
+
+let UrlPair = mongoose.model("UrlPair", urlPairSchema);
+
 var bodyParser = require('body-parser');
+
+
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -36,37 +57,47 @@ function getNthPosition(myString, substring, n){
   return 0;
 }
 
-app.post('/api/:shorturl?', (req, res) =>{
+app.post('/api/shorturl', async (req, res) =>{
+  const max = 5000;
   console.log(req.body.url);
   
   //verify url using dns core
   var foundhost = false;
   dns.lookup(req.body.url,(err, address, family)=>{
-    if(!err){
-      console.log("found host");
-      foundhost = true;
+    if(err){
+      res.json({error: 'invalid url'});
+      return
     }
   });
-  //if not valid return with error
-  if(!foundhost){
-    res.json({error: 'invalid url'});
-    return
-  }
-  
-  
-  //get origion url
-  var position = getNthPosition(req.body.url, '/', 3);
-  console.log("position of the 3rd / is : ", position);
-  var origional  = req.body.url.slice(0, position);
-  
-  //get short url after /api/
-  position = getNthPosition(req.body.url, '/', 4);
-  var shortUrl = req.body.url.slice(position+1);
 
-  res.json({
-    origional_url:origional,
-    short_url:shortUrl
+  var shortUrls = await UrlPair.find({},{shortUrl:1, _id:0});
+
+  const newShortUrl = Math.floor(Math.random() * max).toString();
+
+  while(newShortUrl in shortUrls){
+    newShortUrl = Math.floor(Math.random() * max).toString();
+  }
+
+  UrlPair.create({origionalUrl:req.body.url, shortUrl: newShortUrl})
+  .then((newUrlPair) => {
+    res.json({
+      origional_url : newUrlPair.origionalUrl,
+      short_url : newUrlPair.shortUrl
+      });
   });
+  
+  
+});
+
+app.get('/api/shorturl/:shortUrl', async (req, res)=>{
+  const short = req.params.shortUrl;
+  const pair = await UrlPair.findOne({shortUrl:short});
+  if(!pair){
+    //error
+    res.send("error finding short");
+  }
+
+  res.redirect(301, "http://" + pair.origionalUrl);
 });
 
 
